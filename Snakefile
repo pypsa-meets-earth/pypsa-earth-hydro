@@ -594,6 +594,8 @@ def inputs_hydro(w):
             "powerplants": "resources/" + RDIR + "powerplants.csv",
             "hydrobasins": config["renewable"]["hydro"]["resource"]["hydrobasins"],
         }
+        if config["renewable"]["hydro"]["snapping"]["enable"]:
+            HYDRO_PROFILES["hydro_plants"] = "resources/" + RDIR + "hydro_plants.csv"
         return HYDRO_PROFILES
     else:
         return {}
@@ -668,6 +670,24 @@ rule build_powerplants:
         mem_mb=500,
     script:
         "scripts/build_powerplants.py"
+
+
+rule prepare_hydro_plants:
+    params:
+        snapping=config["renewable"]["hydro"]["snapping"],
+    input:
+        powerplants="resources/" + RDIR + "powerplants.csv",
+    output:
+        hydro_plants="resources/" + RDIR + "hydro_plants.csv",
+    log:
+        "logs/" + RDIR + "prepare_hydro_plants.log",
+    benchmark:
+        "benchmarks/" + RDIR + "prepare_hydro_plants"
+    threads: 1
+    resources:
+        mem_mb=1000,
+    script:
+        "scripts/prepare_hydro_plants.py"
 
 
 rule add_electricity:
