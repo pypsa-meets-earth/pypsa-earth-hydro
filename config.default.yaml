@@ -456,6 +456,14 @@ renewable:
     extendable: true
     csp_model: advanced # simple or advanced
 
+hydro_network: # water network (m3/s) of the rivers, driven by the GloFAS discharge of the renewable hydro cutout; build with `snakemake -call build_hydro_network`
+  enable: false # true also builds the water network as part of `solve_all_networks`, i.e. of a scenario run
+  ldd: data/glofas/ldd_glofas_v4_0.nc # GloFAS local drainage direction, downloaded if missing
+  uparea: data/glofas/uparea_glofas_v4_0.nc # GloFAS upstream area, downloaded if missing
+  min_upstream_area_km2: 500 # [km2] cells with a larger upstream area form the river network (GloFAS calibration catchments start at 500 km2)
+  bus_spacing_km: 50 # [km] river length after which a bus is placed along a reach
+  clip_negative_inflow: true # set negative local inflow (discharge below the upstream discharge) to zero
+
 # ------------------- Storage technologies -------------------
 storage_techs:
   # All technology abbreviations are defined in https://pypsa-earth.readthedocs.io/en/latest/user-guide/configuration/#storage-technologies

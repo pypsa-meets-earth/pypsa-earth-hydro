@@ -70,17 +70,17 @@ from rasterio.windows import Window, from_bounds
 
 logger = create_logger(__name__)
 
-# GloFAS v4 static map, see https://confluence.ecmwf.int/display/CEMS/Auxiliary+Data
-GLOFAS_UPAREA_URL = (
-    "https://confluence.ecmwf.int/download/attachments/242067380/uparea_glofas_v4_0.nc"
+# GloFAS v4 static maps, see https://confluence.ecmwf.int/display/CEMS/Auxiliary+Data
+GLOFAS_MAP_URL = (
+    "https://confluence.ecmwf.int/download/attachments/242067380/{}_glofas_v4_0.nc"
 )
 MERIT_NODATA = -9999.0  # MERIT `upa` no-data (ocean/undefined)
 
 
-def load_glofas_uparea(path):
+def load_glofas_map(path, var):
     """
-    Open the GloFAS v4 upstream-area map in km2 with ascending x/y coordinates,
-    downloading it to `path` if it does not exist.
+    Open the GloFAS v4 static map `var` (e.g. ``uparea``, ``ldd``) with ascending x/y
+    coordinates, downloading it to `path` if it does not exist.
 
     Coordinates are rounded to 5 decimals so the cells co-register with the GloFAS
     discharge grid of a cutout.
@@ -89,20 +89,25 @@ def load_glofas_uparea(path):
     "Contains modified Copernicus Emergency Management Service information".
     """
     if not os.path.exists(path):
-        logger.info(f"Downloading GloFAS uparea map from {GLOFAS_UPAREA_URL} to {path}")
+        url = GLOFAS_MAP_URL.format(var)
+        logger.info(f"Downloading GloFAS {var} map from {url} to {path}")
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        progress_retrieve(GLOFAS_UPAREA_URL, path)
+        progress_retrieve(url, path)
 
-    uparea = xr.open_dataset(path)["uparea"].rename({"longitude": "x", "latitude": "y"})
-    uparea = (
-        uparea.assign_coords(
-            x=np.round(uparea.x.astype(float), 5),
-            y=np.round(uparea.y.astype(float), 5),
-        )
-        .sortby("x")
-        .sortby("y")
+    da = xr.open_dataset(path)[var]
+    names = {"lon": "x", "longitude": "x", "lat": "y", "latitude": "y"}
+    da = da.rename({d: names[d] for d in da.dims})
+    da = da.assign_coords(
+        x=np.round(da.x.astype(float), 5), y=np.round(da.y.astype(float), 5)
     )
-    return (uparea / 1e6).transpose("y", "x")  # m2 -> km2
+    return da.sortby("x").sortby("y").transpose("y", "x")
+
+
+def load_glofas_uparea(path):
+    """
+    Open the GloFAS v4 upstream-area map in km2, see :func:`load_glofas_map`.
+    """
+    return load_glofas_map(path, "uparea") / 1e6  # m2 -> km2
 
 
 def _merit_tile(lat, lon):
