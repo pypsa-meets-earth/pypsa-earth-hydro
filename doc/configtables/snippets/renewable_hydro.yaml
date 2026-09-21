@@ -20,3 +20,11 @@
       year: 2023 # (optional) year of statistics used to rescale the runoff time series. When not provided, the cutout weather year is used
     multiplier: 1.1 # multiplier applied after the normalization of the hydro production; default 1.0
     hydro_min_inflow_pu: 1.0 # [hour] A threshold of energy to power ratio to classify hydro powerplants as reservoirs in case type is missed
+    snapping: # move hydro plants to the nearby GloFAS river cell that matches their upstream area; only applied with discharge (GloFAS) cutouts
+      enable: false
+      glofas_uparea: data/glofas/uparea_glofas_v4_0.nc # downloaded if missing
+      merit_root: data/merit_hydro # MERIT Hydro upa tiles (manual download: https://global-hydrodynamics.github.io/MERIT_Hydro/)
+      search_radius_km: 1.0 # search radius for the MERIT river cell around a plant
+      min_upa_km2: 10.0 # minimum MERIT upstream area of a river cell
+      radius: 3 # search window around a plant in GloFAS cells, (2*radius+1)^2 cells
+      alpha: 0.5 # weight of the distance in the snapping score; 1 - alpha weights the upstream-area mismatch
