@@ -110,6 +110,11 @@ rule solve_all_networks:
             "results/" + RDIR + "networks/elec_s{simpl}_{clusters}_ec_l{ll}_{opts}.nc",
             **config["scenario"],
         ),
+        branch(
+            config["hydro_network"]["enable"],
+            "networks/" + RDIR + "hydro_network.nc",
+            [],
+        ),
 
 
 rule plot_all_p_nom:
@@ -594,6 +599,8 @@ def inputs_hydro(w):
             "powerplants": "resources/" + RDIR + "powerplants.csv",
             "hydrobasins": config["renewable"]["hydro"]["resource"]["hydrobasins"],
         }
+        if config["renewable"]["hydro"]["snapping"]["enable"]:
+            HYDRO_PROFILES["hydro_plants"] = "resources/" + RDIR + "hydro_plants.csv"
         return HYDRO_PROFILES
     else:
         return {}
@@ -668,6 +675,44 @@ rule build_powerplants:
         mem_mb=500,
     script:
         "scripts/build_powerplants.py"
+
+
+rule prepare_hydro_plants:
+    params:
+        snapping=config["renewable"]["hydro"]["snapping"],
+    input:
+        powerplants="resources/" + RDIR + "powerplants.csv",
+    output:
+        hydro_plants="resources/" + RDIR + "hydro_plants.csv",
+    log:
+        "logs/" + RDIR + "prepare_hydro_plants.log",
+    benchmark:
+        "benchmarks/" + RDIR + "prepare_hydro_plants"
+    threads: 1
+    resources:
+        mem_mb=1000,
+    script:
+        "scripts/prepare_hydro_plants.py"
+
+
+rule build_hydro_network:
+    params:
+        snapshots=config["snapshots"],
+        hydro_network=config["hydro_network"],
+    input:
+        country_shapes="resources/" + RDIR + "shapes/country_shapes.geojson",
+        cutout="cutouts/" + CDIR + config["renewable"]["hydro"]["cutout"] + ".nc",
+    output:
+        hydro_network="networks/" + RDIR + "hydro_network.nc",
+    log:
+        "logs/" + RDIR + "build_hydro_network.log",
+    benchmark:
+        "benchmarks/" + RDIR + "build_hydro_network"
+    threads: 1
+    resources:
+        mem_mb=6000,
+    script:
+        "scripts/build_hydro_network.py"
 
 
 rule add_electricity:
