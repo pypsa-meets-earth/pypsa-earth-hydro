@@ -19,6 +19,7 @@ Relevant Settings
                 min_upa_km2:
                 radius:
                 alpha:
+                max_mw_per_km2:
 
 Inputs
 ------
@@ -53,6 +54,10 @@ upstream area expected at the plant:
    A_j the GloFAS upstream area of cell j and A_exp the expected upstream area. The
    relative area mismatch rejects a cell on a much bigger or smaller branch even if it
    is the closest one. Plants without an expected upstream area stay unallocated.
+3. plausibility -- an expected upstream area that cannot carry the plant's capacity
+   (more than ``max_mw_per_km2``) is the local stream of a plant fed by a canal or
+   tunnel. Such a plant is allocated to the cell with the largest upstream area in
+   the search window instead.
 """
 
 import os
@@ -272,6 +277,7 @@ def snap_plants(
     min_upa_km2=10.0,
     radius=3,
     alpha=0.5,
+    max_mw_per_km2=5.0,
 ):
     """
     Allocate plants to the GloFAS cell that best matches their expected upstream area.
@@ -279,7 +285,7 @@ def snap_plants(
     Parameters
     ----------
     plants : pd.DataFrame
-        Plants with `lon`, `lat` columns.
+        Plants with `lon`, `lat` and `p_nom` columns.
     glofas_uparea : str
         Path to the GloFAS upstream-area map; downloaded if missing.
     merit_root : str
@@ -291,6 +297,9 @@ def snap_plants(
         Search radius in GloFAS cells; the window is (2*radius+1)^2 cells.
     alpha : float
         Weight of the distance term; `1 - alpha` weights the area mismatch.
+    max_mw_per_km2 : float
+        Capacity per expected upstream area [MW/km2] above which that area is taken
+        as implausible; the plant then goes to the largest upstream area in the window.
 
     Returns
     -------
@@ -311,8 +320,9 @@ def snap_plants(
     for col in cols:
         plants[col] = np.nan
 
-    for idx, plant in plants[["lon", "lat", "catchment_area"]].iterrows():
-        lon, lat, a_exp = plant.astype(float)
+    fallback = []
+    for idx, plant in plants[["lon", "lat", "catchment_area", "p_nom"]].iterrows():
+        lon, lat, a_exp, p_nom = plant.astype(float)
         if not np.isfinite(a_exp) or a_exp <= 0:
             continue
 
@@ -330,10 +340,21 @@ def snap_plants(
         d = haversine([lon, lat], np.column_stack([cx, cy]))[0]
         score = alpha * d / max(d.max(), 1e-9) + (1 - alpha) * np.abs(a - a_exp) / a_exp
         j = int(np.argmin(score))
+        # a catchment this small cannot carry the capacity: the plant is fed by a canal
+        # or tunnel, so take the main river in the window instead of the local stream
+        if p_nom > max_mw_per_km2 * a_exp:
+            j = int(np.argmax(a))
+            fallback.append(idx)
         plants.loc[idx, cols] = (cx[j], cy[j], a[j], d[j], score[j])
 
     n = int(plants["snap_score"].notna().sum())
     logger.info(f"Upstream-area snapping: {n}/{len(plants)} plants allocated.")
+    if fallback:
+        logger.info(
+            f"{len(fallback)} plants with more than {max_mw_per_km2} MW per km2 of "
+            "expected upstream area were allocated to the largest upstream area in the "
+            f"window: {', '.join(plants.loc[fallback, 'name'].astype(str))}"
+        )
     return plants
 
 

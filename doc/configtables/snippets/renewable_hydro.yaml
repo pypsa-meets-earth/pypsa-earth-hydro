@@ -28,3 +28,4 @@
       min_upa_km2: 10.0 # minimum MERIT upstream area of a river cell
       radius: 3 # search window around a plant in GloFAS cells, (2*radius+1)^2 cells
       alpha: 0.5 # weight of the distance in the snapping score; 1 - alpha weights the upstream-area mismatch
+      max_mw_per_km2: 5.0 # [MW/km2] above this capacity per expected upstream area the plant is fed by a canal or tunnel and goes to the largest upstream area in the window (5 ~ 2000 m head, 60 l/s/km2 runoff, 20 % capacity factor)
