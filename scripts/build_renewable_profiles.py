@@ -42,6 +42,8 @@ Relevant settings
             clip_p_max_pu:
             resource:
             clip_min_inflow:
+            snapping:
+                enable:
 
 .. seealso::
     Documentation of the configuration file ``config.yaml`` at
@@ -68,6 +70,7 @@ Inputs
 - ``resources/regions_offshore.geojson``: (if offshore wind), :ref:`busregions`
 - ``"cutouts/" + config["renewable"][{technology}]['cutout']``: :ref:`cutout`
 - ``networks/base.nc``: :ref:`base`
+- ``resources/hydro_plants.csv``: (if hydro snapping is enabled) hydro plants allocated to GloFAS river cells, see :mod:`prepare_hydro_plants`
 
 Outputs
 -------
@@ -640,6 +643,29 @@ if __name__ == "__main__":
             ).to_netcdf(snakemake.output.profile)
         else:
             # otherwise perform the calculations
+            if config["snapping"]["enable"]:
+                if "discharge" in cutout.data.data_vars:
+                    # atlite extracts the discharge at plants["lon"/"lat"], so move
+                    # the allocated plants onto their GloFAS cell centre; unallocated
+                    # plants keep their original location
+                    snapped = pd.read_csv(paths.hydro_plants, index_col=0).dropna(
+                        subset=["x_snapped", "y_snapped"]
+                    )
+                    idx = resource["plants"].index.intersection(snapped.index)
+                    resource["plants"].loc[idx, ["lon", "lat"]] = snapped.loc[
+                        idx, ["x_snapped", "y_snapped"]
+                    ].to_numpy()
+                    logger.info(
+                        f"{len(idx)}/{len(resource['plants'])} hydro plants moved "
+                        "to their allocated GloFAS river cell."
+                    )
+                else:
+                    logger.warning(
+                        "Hydro snapping only applies to discharge (GloFAS) cutouts; "
+                        f"{paths.cutout} has no discharge variable, so the plants "
+                        "keep their original location."
+                    )
+
             inflow = correction_factor * func(capacity_factor=True, **resource)
 
             if "clip_min_inflow" in config:

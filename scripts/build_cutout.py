@@ -125,7 +125,7 @@ if __name__ == "__main__":
         offshore = gpd.read_file(offshore_shapes)
         regions = pd.concat([onshore, offshore])
         d = max(cutout_params.get("dx", 0.25), cutout_params.get("dy", 0.25)) * 2
-        cutout_params["bounds"] = regions.total_bounds + [-d, -d, d, d]
+        cutout_params["bounds"] = tuple(regions.total_bounds + [-d, -d, d, d])
     elif {"x", "y"}.issubset(cutout_params):
         cutout_params["x"] = slice(*cutout_params["x"])
         cutout_params["y"] = slice(*cutout_params["y"])
@@ -133,4 +133,11 @@ if __name__ == "__main__":
     logger.info(f"Preparing cutout with parameters {cutout_params}.")
     features = cutout_params.pop("features", None)
     cutout = atlite.Cutout(snakemake.output[0], **cutout_params)
-    cutout.prepare(features=features)
+    # The threaded dask scheduler deadlocks here on large grids: the netCDF write
+    # and the netCDF-backed source share a non-reentrant HDF5 lock. Both settings
+    # come from `atlite:` in the config; compression=None keeps atlite's default.
+    cutout.prepare(
+        features=features,
+        compression=snakemake.params.compression,
+        dask_kwargs={"scheduler": snakemake.params.dask_scheduler},
+    )
